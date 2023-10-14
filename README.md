@@ -1,0 +1,1 @@
+# terraform-plugin-static-code-analysis
