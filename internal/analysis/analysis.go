@@ -1,69 +1,43 @@
 package analysis
 
 import (
-	"encoding/json"
-	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"log"
+	"os"
+	"strings"
 )
 
-type ItemSet struct {
-	Items []*Item `json:"items"`
-}
-
-type Item struct {
-	Name   string   `json:"name"`
-	Impact []string `json:"impact"`
-}
-
-func NewItemSet() *ItemSet {
-	return &ItemSet{}
-}
-
-func (s *ItemSet) InsertItem(i Item) {
-	s.Items = append(s.Items, &i)
-}
-
-func (s *ItemSet) Item(n string) *Item {
-	for _, i := range s.Items {
-		if i.Name == n {
-			return i
-		}
-	}
-
-	return nil
-}
-
-func (s *ItemSet) HasItem(n string) *Item {
-	for _, i := range s.Items {
-		if i.Name == n {
-			return i
-		}
-	}
-
-	return nil
-}
-
-func Analysis(path string) {
+func Analysis(path string) *ItemSet {
 	itemSet := NewItemSet()
 	fset := token.NewFileSet()
-	dir, err := parser.ParseDir(fset, path, nil, parser.ParseComments)
+
+	filter := func(d os.FileInfo) bool {
+		if strings.Contains(d.Name(), "_test.go") {
+			return false
+		}
+
+		return true
+	}
+
+	dir, err := parser.ParseDir(fset, path, filter, parser.ParseComments)
 	if err != nil {
 		panic(err)
 	}
+
 	for _, d := range dir {
-		for _, file := range d.Files {
+		for fname, file := range d.Files {
 			ast.Inspect(file, func(n ast.Node) bool {
 				if n == nil {
 					return false
 				}
 				switch x := n.(type) {
 				case *ast.FuncDecl:
-					if v := itemSet.HasItem(x.Name.String()); v == nil {
+					if v := itemSet.Item(x.Name.String()); v == nil {
 						itemSet.InsertItem(Item{
-							Name: x.Name.String(),
+							Name:     x.Name.String(),
+							FileName: fname,
+							Impact:   make(map[string]struct{}),
 						})
 					}
 					inspectFunc(itemSet, x)
@@ -74,12 +48,7 @@ func Analysis(path string) {
 		}
 	}
 
-	o, err := json.Marshal(itemSet)
-	if err != nil {
-		log.Fatalf(err.Error())
-		panic(err)
-	}
-	fmt.Println(string(o))
+	return itemSet
 }
 
 func inspectFunc(s *ItemSet, b *ast.FuncDecl) {
@@ -93,14 +62,15 @@ func inspectFunc(s *ItemSet, b *ast.FuncDecl) {
 			// *ast.Ident -- local function
 			case *ast.Ident:
 				fname := x.Name
-				v := s.HasItem(fname)
+				v := s.Item(fname)
 				if v == nil {
 					s.InsertItem(Item{
-						Name: fname,
+						Name:   fname,
+						Impact: make(map[string]struct{}),
 					})
 				}
 				if i := s.Item(fname); i != nil {
-					i.Impact = append(i.Impact, b.Name.String())
+					i.Impact[b.Name.String()] = struct{}{}
 				}
 				return false
 			// *ast.SelectorExpr -- imported functions
