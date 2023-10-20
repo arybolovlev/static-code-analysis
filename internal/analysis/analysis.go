@@ -26,18 +26,19 @@ func Analysis(path string) *ItemSet {
 	}
 
 	for _, d := range dir {
-		for fname, file := range d.Files {
+		// _ -- filename
+		for _, file := range d.Files {
 			ast.Inspect(file, func(n ast.Node) bool {
 				if n == nil {
 					return false
 				}
 				switch x := n.(type) {
+				// *ast.FuncDecl -- functions and methods
 				case *ast.FuncDecl:
 					if v := itemSet.Item(x.Name.String()); v == nil {
 						itemSet.InsertItem(Item{
-							Name:     x.Name.String(),
-							FileName: fname,
-							Impact:   make(map[string]struct{}),
+							Name:   x.Name.String(),
+							Impact: make(map[string]struct{}),
 						})
 					}
 					inspectFunc(itemSet, x)
