@@ -62,15 +62,15 @@ func inspectFunc(s *ItemSet, b *ast.FuncDecl) {
 			switch x := t.Fun.(type) {
 			// *ast.Ident -- local function
 			case *ast.Ident:
-				fname := x.Name
-				v := s.Item(fname)
+				fnName := x.Name
+				v := s.Item(fnName)
 				if v == nil {
 					s.InsertItem(Item{
-						Name:   fname,
+						Name:   fnName,
 						Impact: make(map[string]struct{}),
 					})
 				}
-				if i := s.Item(fname); i != nil {
+				if i := s.Item(fnName); i != nil {
 					i.Impact[b.Name.String()] = struct{}{}
 				}
 				return false
