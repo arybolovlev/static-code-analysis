@@ -10,7 +10,7 @@ vet: ## Run go vet against code.
 
 .PHONY: test
 test: fmt vet ## Run tests.
-	go test -v -vet=off -count=1 -timeout 5m -v ./...
+	go test -vet=off -count=1 -timeout 5m -v ./...
 
 ##@ Build
 
