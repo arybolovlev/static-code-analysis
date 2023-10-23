@@ -22,3 +22,6 @@ go.work
 
 # Dev files
 bin/
+
+# MacOS files
+.DS_Store
