@@ -28,11 +28,14 @@ func Analysis(path string) *Nodes {
 	}
 
 	for _, d := range dir {
-		// _ -- filename
+		// '_' represents a file name
 		for _, file := range d.Files {
+			ast.Print(fset, file)
 			ast.Inspect(file, func(n ast.Node) bool {
 				switch x := n.(type) {
-				// *ast.FuncDecl -- functions and methods
+				// Either functions and methods declaration.
+				// The choice depends on whether there is a receiver or not.
+				// If there is a receiver, then it is a method. Otherwise, it is a function.
 				case *ast.FuncDecl:
 					nodesSet.InsertNode(Node{
 						Name:     x.Name.String(),
@@ -42,6 +45,7 @@ func Analysis(path string) *Nodes {
 					queue = append(queue, x)
 					return false
 				}
+				// Pick up next Node.
 				return true
 			})
 		}
