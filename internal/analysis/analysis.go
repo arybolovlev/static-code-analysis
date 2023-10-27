@@ -8,8 +8,8 @@ import (
 	"strings"
 )
 
-func Analysis(path string) *ItemSet {
-	itemSet := NewItemSet()
+func Analysis(path string) *NodesSet {
+	itemSet := NewNodeSet()
 	fset := token.NewFileSet()
 
 	filter := func(d os.FileInfo) bool {
@@ -35,13 +35,13 @@ func Analysis(path string) *ItemSet {
 				switch x := n.(type) {
 				// *ast.FuncDecl -- functions and methods
 				case *ast.FuncDecl:
-					if v := itemSet.Item(x.Name.String()); v == nil {
-						itemSet.InsertItem(Item{
+					if v := itemSet.GetNode(x.Name.String()); v == nil {
+						itemSet.InsertNode(Node{
 							Name:   x.Name.String(),
-							Impact: make(map[string]struct{}),
+							Impact: make(map[*Node]struct{}),
 						})
 					}
-					inspectFunc(itemSet, x)
+					// inspectFunc(itemSet, x)
 					return false
 				}
 				return true
@@ -52,33 +52,33 @@ func Analysis(path string) *ItemSet {
 	return itemSet
 }
 
-func inspectFunc(s *ItemSet, b *ast.FuncDecl) {
-	ast.Inspect(b.Body, func(n ast.Node) bool {
-		if n == nil {
-			return false
-		}
-		switch t := n.(type) {
-		case *ast.CallExpr:
-			switch x := t.Fun.(type) {
-			// *ast.Ident -- local function
-			case *ast.Ident:
-				fnName := x.Name
-				v := s.Item(fnName)
-				if v == nil {
-					s.InsertItem(Item{
-						Name:   fnName,
-						Impact: make(map[string]struct{}),
-					})
-				}
-				if i := s.Item(fnName); i != nil {
-					i.Impact[b.Name.String()] = struct{}{}
-				}
-				return false
-			// *ast.SelectorExpr -- imported functions
-			case *ast.SelectorExpr:
-				return false
-			}
-		}
-		return true
-	})
-}
+// func inspectFunc(s *NodesSet, b *ast.FuncDecl) {
+// 	ast.Inspect(b.Body, func(n ast.Node) bool {
+// 		if n == nil {
+// 			return false
+// 		}
+// 		switch t := n.(type) {
+// 		case *ast.CallExpr:
+// 			switch x := t.Fun.(type) {
+// 			// *ast.Ident -- local function
+// 			case *ast.Ident:
+// 				fnName := x.Name
+// 				v := s.GetNode(fnName)
+// 				if v == nil {
+// 					s.InsertNode(Node{
+// 						Name:   fnName,
+// 						Impact: make(map[*Node]struct{}),
+// 					})
+// 				}
+// 				if i := s.GetNode(fnName); i != nil {
+// 					i.Impact[b.Name.String()] = struct{}{}
+// 				}
+// 				return false
+// 			// *ast.SelectorExpr -- imported functions
+// 			case *ast.SelectorExpr:
+// 				return false
+// 			}
+// 		}
+// 		return true
+// 	})
+// }
