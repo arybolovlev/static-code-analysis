@@ -1,16 +1,13 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
 
-func a() {
-	a := 1
-	fmt.Println(a)
-	b()
-	c()
+	"github.com/arybolovlev/static-code-analysis/test/cmd"
+)
+
+func main() {
+	cmd.Run()
+	a()
+	fmt.Println("Hello")
 }
-
-func b() {
-	c()
-}
-
-func c() {}
