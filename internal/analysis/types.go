@@ -1,25 +1,25 @@
 package analysis
 
-type NodesSet struct {
-	Nodes []*Node `json:"items"`
+type Nodes struct {
+	Nodes []*Node `json:"nodes"`
 }
 
 type Node struct {
-	Name string `json:"name"`
-	// FileName string              `json:"fileName"`
-	Impact map[*Node]struct{} `json:"impact"`
+	Name     string              `json:"name"`
+	CalledBy map[string]struct{} `json:"calledBy"`
+	Calls    map[string]struct{} `json:"calls"`
 }
 
-func NewNodeSet() *NodesSet {
-	return &NodesSet{}
+func NewNode() *Nodes {
+	return &Nodes{}
 }
 
-func (s *NodesSet) InsertNode(n Node) {
-	s.Nodes = append(s.Nodes, &n)
+func (ns *Nodes) InsertNode(n Node) {
+	ns.Nodes = append(ns.Nodes, &n)
 }
 
-func (s *NodesSet) GetNode(n string) *Node {
-	for _, i := range s.Nodes {
+func (ns *Nodes) GetNode(n string) *Node {
+	for _, i := range ns.Nodes {
 		if i.Name == n {
 			return i
 		}

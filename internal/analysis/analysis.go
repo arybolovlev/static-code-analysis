@@ -1,6 +1,7 @@
 package analysis
 
 import (
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -8,8 +9,9 @@ import (
 	"strings"
 )
 
-func Analysis(path string) *NodesSet {
-	itemSet := NewNodeSet()
+func Analysis(path string) *Nodes {
+	queue := make([]*ast.FuncDecl, 0)
+	nodesSet := NewNode()
 	fset := token.NewFileSet()
 
 	filter := func(d os.FileInfo) bool {
@@ -29,19 +31,15 @@ func Analysis(path string) *NodesSet {
 		// _ -- filename
 		for _, file := range d.Files {
 			ast.Inspect(file, func(n ast.Node) bool {
-				if n == nil {
-					return false
-				}
 				switch x := n.(type) {
 				// *ast.FuncDecl -- functions and methods
 				case *ast.FuncDecl:
-					if v := itemSet.GetNode(x.Name.String()); v == nil {
-						itemSet.InsertNode(Node{
-							Name:   x.Name.String(),
-							Impact: make(map[*Node]struct{}),
-						})
-					}
-					// inspectFunc(itemSet, x)
+					nodesSet.InsertNode(Node{
+						Name:     x.Name.String(),
+						CalledBy: make(map[string]struct{}),
+						Calls:    make(map[string]struct{}),
+					})
+					queue = append(queue, x)
 					return false
 				}
 				return true
@@ -49,36 +47,34 @@ func Analysis(path string) *NodesSet {
 		}
 	}
 
-	return itemSet
+	for _, q := range queue {
+		inspectFunc(q, nodesSet)
+	}
+
+	return nodesSet
 }
 
-// func inspectFunc(s *NodesSet, b *ast.FuncDecl) {
-// 	ast.Inspect(b.Body, func(n ast.Node) bool {
-// 		if n == nil {
-// 			return false
-// 		}
-// 		switch t := n.(type) {
-// 		case *ast.CallExpr:
-// 			switch x := t.Fun.(type) {
-// 			// *ast.Ident -- local function
-// 			case *ast.Ident:
-// 				fnName := x.Name
-// 				v := s.GetNode(fnName)
-// 				if v == nil {
-// 					s.InsertNode(Node{
-// 						Name:   fnName,
-// 						Impact: make(map[*Node]struct{}),
-// 					})
-// 				}
-// 				if i := s.GetNode(fnName); i != nil {
-// 					i.Impact[b.Name.String()] = struct{}{}
-// 				}
-// 				return false
-// 			// *ast.SelectorExpr -- imported functions
-// 			case *ast.SelectorExpr:
-// 				return false
-// 			}
-// 		}
-// 		return true
-// 	})
-// }
+func inspectFunc(b *ast.FuncDecl, s *Nodes) {
+	ast.Inspect(b.Body, func(n ast.Node) bool {
+		caller := s.GetNode(b.Name.String())
+		switch t := n.(type) {
+		case *ast.CallExpr:
+			switch x := t.Fun.(type) {
+			// *ast.Ident -- local function
+			case *ast.Ident:
+				callee := s.GetNode(x.Name)
+				callee.CalledBy[caller.Name] = struct{}{}
+
+				caller.Calls[callee.Name] = struct{}{}
+				return false
+			// *ast.SelectorExpr -- imported functions
+			case *ast.SelectorExpr:
+				callee := x.Sel.Name
+				pkg := x.X.(*ast.Ident).Name
+				caller.Calls[fmt.Sprintf("%s.%s", pkg, callee)] = struct{}{}
+				return false
+			}
+		}
+		return true
+	})
+}
