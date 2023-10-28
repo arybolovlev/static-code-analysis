@@ -7,22 +7,22 @@ import (
 )
 
 func TestNewItemSet(t *testing.T) {
-	want := &ItemSet{}
-	have := NewItemSet()
+	want := &Nodes{}
+	have := NewNode()
 
 	assert.Equal(t, have, want)
 }
 
 func TestInsertItem(t *testing.T) {
-	want := &ItemSet{
-		Items: []*Item{
+	want := &Nodes{
+		Nodes: []*Node{
 			{
 				Name: "this",
 			},
 		},
 	}
-	have := NewItemSet()
-	have.InsertItem(Item{
+	have := NewNode()
+	have.InsertNode(Node{
 		Name: "this",
 	})
 
@@ -30,18 +30,18 @@ func TestInsertItem(t *testing.T) {
 }
 
 func TestItem(t *testing.T) {
-	i := &ItemSet{
-		Items: []*Item{
+	i := &Nodes{
+		Nodes: []*Node{
 			{
 				Name: "this",
 			},
 		},
 	}
 
-	want := &Item{
+	want := &Node{
 		Name: "this",
 	}
-	have := i.Item("this")
+	have := i.GetNode("this")
 
 	assert.Equal(t, have, want)
 }
