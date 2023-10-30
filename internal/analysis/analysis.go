@@ -1,19 +1,21 @@
 package analysis
 
 import (
-	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"os"
 	"strings"
+
+	"github.com/arybolovlev/static-code-analysis/internal/types"
 )
 
-func Analysis(path string) *Nodes {
+func Analysis(path string) *types.Package {
 	queue := make([]*ast.FuncDecl, 0)
-	nodesSet := NewNode()
+	pkg := types.NewPackage()
 	fset := token.NewFileSet()
 
+	// move to a diff file filters.go and think about more pre-build filters
 	filter := func(d os.FileInfo) bool {
 		if strings.Contains(d.Name(), "_test.go") {
 			return false
@@ -22,27 +24,43 @@ func Analysis(path string) *Nodes {
 		return true
 	}
 
-	dir, err := parser.ParseDir(fset, path, filter, parser.ParseComments)
+	pkgs, err := parser.ParseDir(fset, path, filter, parser.ParseComments)
 	if err != nil {
 		panic(err)
 	}
 
-	for _, d := range dir {
+	for _, p := range pkgs {
+		pkg.Name = p.Name
 		// '_' represents a file name
-		for _, file := range d.Files {
-			ast.Print(fset, file)
+		for _, file := range p.Files {
+			// Imports in this file
+			imp := make(map[string]string)
+			for _, i := range file.Imports {
+				var name string
+				path := strings.Trim(i.Path.Value, `"`)
+				if i.Name == nil {
+					n := strings.Split(path, "/")
+					name = n[len(n)-1]
+				} else {
+					name = i.Name.String()
+				}
+				imp[name] = path
+			}
+
+			// ast.Print(fset, file)
 			ast.Inspect(file, func(n ast.Node) bool {
 				switch x := n.(type) {
 				// Either functions and methods declaration.
 				// The choice depends on whether there is a receiver or not.
 				// If there is a receiver, then it is a method. Otherwise, it is a function.
 				case *ast.FuncDecl:
-					nodesSet.InsertNode(Node{
-						Name:     x.Name.String(),
-						CalledBy: make(map[string]struct{}),
-						Calls:    make(map[string]struct{}),
-					})
+					nn := *types.NewNode(x.Name.String())
+					nn.Imports = imp
+					pkg.InsertNode(nn)
 					queue = append(queue, x)
+					return false
+				case *ast.TypeSpec:
+					pkg.InsertStruct(types.Struct{Name: x.Name.String()})
 					return false
 				}
 				// Pick up next Node.
@@ -51,14 +69,16 @@ func Analysis(path string) *Nodes {
 		}
 	}
 
+	// fmt.Println("Queue length:", len(queue))
 	for _, q := range queue {
-		inspectFunc(q, nodesSet)
+		inspectFunc(q, pkg)
 	}
 
-	return nodesSet
+	return pkg
 }
 
-func inspectFunc(b *ast.FuncDecl, s *Nodes) {
+func inspectFunc(b *ast.FuncDecl, s *types.Package) {
+	vars := make(map[string]string)
 	ast.Inspect(b.Body, func(n ast.Node) bool {
 		caller := s.GetNode(b.Name.String())
 		switch t := n.(type) {
@@ -67,16 +87,31 @@ func inspectFunc(b *ast.FuncDecl, s *Nodes) {
 			// *ast.Ident -- local function
 			case *ast.Ident:
 				callee := s.GetNode(x.Name)
-				callee.CalledBy[caller.Name] = struct{}{}
-
-				caller.Calls[callee.Name] = struct{}{}
-				return false
+				// callee can be `nil` in the case of build in functions like `make`
+				// need to add validation here and/or exclude build in functions from ending up in the list
+				callee.CalledBy[caller.Name] = &types.Func{}
+				//
+				caller.Calls[callee.Name] = &types.Func{}
 			// *ast.SelectorExpr -- imported functions
 			case *ast.SelectorExpr:
 				callee := x.Sel.Name
 				pkg := x.X.(*ast.Ident).Name
-				caller.Calls[fmt.Sprintf("%s.%s", pkg, callee)] = struct{}{}
-				return false
+				st := vars[pkg]
+				caller.Calls[callee] = &types.Func{
+					PkgName:    pkg,
+					PkgPath:    caller.Imports[pkg],
+					StructName: st,
+				}
+			}
+		case *ast.AssignStmt:
+			for i, a := range t.Lhs {
+				switch x := t.Rhs[i].(type) {
+				case *ast.CompositeLit:
+					varName := a.(*ast.Ident).Name
+					varValue := x.Type.(*ast.Ident).Name
+					// fmt.Println(varName, varValue)
+					vars[varName] = varValue
+				}
 			}
 		}
 		return true
