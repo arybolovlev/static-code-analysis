@@ -16,4 +16,4 @@ test: fmt vet ## Run tests.
 
 .PHONY: build
 build: fmt vet ## Build sonic binary.
-	go build -a -trimpath -o bin/sonic cmd/main.go
+	go build -a -trimpath -o bin/sonic cmd/cmd.go
